@@ -1,14 +1,15 @@
 /* ROOT Component of your App  */
-
+import * as request from 'request-promise'
 import React, { Component } from 'react'
 import logo from './logo.svg'
 import './App.css'
 
 import defaultPicture from './components/img/default.jpg'
 
+
 const Materialize = window.Materialize
 
-const APP_TITLE = 'Awesome App'
+const APP_TITLE = 'Poke'
 //update document title (displayed in the opened browser tab)
 document.title = APP_TITLE
 
@@ -16,20 +17,16 @@ document.title = APP_TITLE
 import { get, ENDPOINTS } from './utils/api'
 
 //components
-import WeatherCard from './components/WeatherCard'
+import PokemonCard from './components/PokemonCard'
 
 class App extends Component {
-
-    /* React state initialization DOCUMENTATION : https://facebook.github.io/react/docs/react-without-es6.html#setting-the-initial-state */
-
     constructor( props ) {
         super( props )
         this.state = {
-            weather: undefined,
-            city: ''
+            pokemon: undefined,
+            id_Pokemon: ''
         }
     }
-
 
     render() {
         return (
@@ -42,17 +39,17 @@ class App extends Component {
                 <div className="App-content">
                     <div className="center-align">
 
-                        <form onSubmit={ this.fetchWeather }>
+                        <form onSubmit={ this.fetchPokemon }>
 
                             <div className="row" style={ { marginBottom: 0 } }>
                                 <div className="input-field col s6 offset-s3">
-                                    <input id="cityInput" type="text" value={ this.state.city } onChange={ this.handleChange } />
-                                    <label htmlFor="cityInput">City</label>
+                                    <input id="pokemonId" type="text" value={ this.state.id_Pokemon } onChange={ this.handleChange } />
+                                    <label htmlFor="pokemonId">Pokemon - Id Ex : 25</label>
                                 </div>
                             </div>
 
                             <button type="submit" className="waves-effect waves-light btn">
-                                Weather?
+                                GoPokemon!
                             </button>
 
                         </form>
@@ -61,7 +58,7 @@ class App extends Component {
 
                     <div className="row" style={ { marginTop: 20 } } >
                         <div className="col s12 m6 offset-m3">
-                            { this.displayWeatherInfo() }
+                            { this.displayPokemonInfo() }
                         </div>
                     </div>
                 </div>
@@ -74,138 +71,86 @@ class App extends Component {
 
     handleChange = ( event ) => {
         this.setState( {
-            city: event.target.value
+            id_Pokemon: event.target.value
         } )
     }
 
-
-    //method triggered by onSubmit event of the form or by onClick event of the "Weather?" button
-    /* Arrow function syntax used for Autobinding, see details here : https://facebook.github.io/react/docs/react-without-es6.html#autobinding */
-    fetchWeather = async ( event ) => {
+    fetchPokemon = async ( event ) => {
 
         event.preventDefault()
 
-        /* ASYNC - AWAIT DOCUMENTATION : https://developer.mozilla.org/fr/docs/Web/JavaScript/Reference/Op%C3%A9rateurs/await */
-
         try {
-            let weather = await get( ENDPOINTS.WEATHER_API_URL, {
-                //YOU NEED TO PROVIDE YOUR "APIXU" API KEY HERE, see /utils/api.js file to grab the DOCUMENTATION file
-                key: '07fb607594c34e5b9ca213416172302',
-                q: this.state.city
-            } )
+            let pokemon = await request.get( {
+                json: true,
+                uri: ENDPOINTS.POKEMON_API_URL + this.state.id_Pokemon
+                })
 
-            //checking that we received a well-formated weather object
-            if ( weather.current ) {
-                //weather data is now received from the server thanks to async-await
-                let updatedWeatherWithImage = await this.fetchPicture( weather )
-
-                /* React state DOCUMENTATION : https://facebook.github.io/react/docs/lifting-state-up.html */
+            if (pokemon.name) {
+                let updatedpokemonWithImage = await this.fetchCaract( pokemon )
                 this.setState( {
-                    weather: updatedWeatherWithImage
+                    pokemon: updatedpokemonWithImage
                 } )
             }
             //handling error
             else {
-                console.log( weather )
-                //weather will contain an error object (see APIXU DOCUMENTATION)
-                Materialize.toast( weather.error.message, 8000, 'error-toast' )
-                //Using Materialize toast component to display error messages - see http://materializecss.com/dialogs.html
+                Materialize.toast('Erreur', 8000, 'error-toast' )
             }
 
 
         }
         catch ( error ) {
-            Materialize.toast( error, 8000, 'error-toast' )
+            Materialize.toast( 'ERROR enter an Id between [1 - 721] ', 8000, 'error-toast' )
             console.log( 'Failed fetching data: ', error )
         }
-
     }
 
-    //will fetch a picture with the name of the city fetched by the weather API
-    //will return an updated weather object (same object + one image)
-    fetchPicture = async ( weather ) => {
+    fetchCaract = async ( pokemon ) => {
         try {
 
-            const pictures = await get( ENDPOINTS.PIXABAY_API_URL, {
-                //YOU NEED TO PROVIDE YOUR "PIXABAY" API KEY HERE (see /utils/api.js file to grab the DOCUMENTATION link)
-                key: '3658891-beeef4fdb6b8a762ab78e1cf9',
-                q: weather.location.name + '+city',
-                image_type: 'all',
-                safesearch: true
-            } )
+            const caracts = await request.get({
+                json: true,
+                uri: ENDPOINTS.CATCH_API_URL + this.state.id_Pokemon
+                })
 
-            //if we have results
-            if ( pictures.hits.length ) {
-                //saving the first picture of the results in our weather object
-                weather.pixabayPicture = pictures.hits[ 0 ].webformatURL
+            if (caracts.flavor_text_entries[1].flavor_text) {
+                pokemon.caracteristique = caracts.flavor_text_entries[1].flavor_text
             }
-            //else we save a defalut picture in our weather object
             else {
-                weather.pixabayPicture = defaultPicture
+                pokemon.caracteristique = "- no informations -"
+            }
+
+            if (caracts.capture_rate) {
+                pokemon.catchRate = caracts.capture_rate
+            }
+            else {
+                pokemon.catchRate = "- no informations -"
             }
 
         }
-        //same default picture is saved if the image request fails
         catch ( error ) {
 
-            weather.pixabayPicture = defaultPicture
-
-            Materialize.toast( error, 8000, 'error-toast' )
+            pokemon.catchRate = "- no informations -"
             console.log( 'Failed fetching picture: ', error )
         }
 
-        return weather
-    }
+        return pokemon
+    }    
 
-
-    //handle display of the received weather object
-    displayWeatherInfo = () => {
-        const weather = this.state.weather
-
-        /*
-            DATA FORMAT SENT BY THE API LOKKS LIKE THIS :
-    
-            {
-                "pixabayPicture": string, //CUSTOM ADD VIA PIXABAY API CALL
-                "location": {
-                    "name": string,
-                    "region": string,
-                    "country": string,
-                    "lat": number,
-                    "lon": number,
-                    "tz_id": string,
-                    "localtime_epoch": number,
-                    "localtime": string
-                },
-                "current": {
-                    "temp_c": number,
-                    "is_day": boolean,
-                    "condition": {
-                        "text": string,
-                        "icon": string
-                    },
-                    "wind_kph": number
-                }
-            }
-    
-        */
-
-        if ( weather ) {
-
-            const locationName = weather.location.name
-            const temperature = weather.current.temp_c
-            const weatherConditionText = weather.current.condition.text
-            const weatherConditionIcon = weather.current.condition.icon
-            const windSpeed = weather.current.wind_kph
-            const picture = weather.pixabayPicture
+    displayPokemonInfo = () => {
+        const pokemon = this.state.pokemon
+        
+        if ( pokemon ) {
+            const pokemonName = pokemon.name
+            const pokemonCaract = pokemon.caracteristique
+            const pokemonType = pokemon.types[0].type.name.replace(/\b\w/g, l => l.toUpperCase())
+            const pokemonId = pokemon.id
+            const pokemonCatchRate = pokemon.catchRate
+            const picture = pokemon.sprites.front_default
 
             return (
-                <WeatherCard
-                    locationName={ locationName }
-                    temperature={ temperature }
-                    weatherConditionText={ weatherConditionText }
-                    weatherConditionIcon={ weatherConditionIcon }
-                    windSpeed={ windSpeed }
+                <PokemonCard
+                    pokemonName={ pokemonName }
+                    pokemonCatchRate={ pokemonCatchRate }
                     picture={ picture } />
             )
         }
